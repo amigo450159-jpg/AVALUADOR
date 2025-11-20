@@ -1,0 +1,10 @@
+streamlit
+streamlit-drawable-canvas
+numpy
+pandas
+scikit-learn
+joblib
+Pillow
+reportlab
+azure-cognitiveservices-vision-computervision
+msrest
