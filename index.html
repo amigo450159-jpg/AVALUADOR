@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avaluador de Computadores</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; background: #f5f7ff; margin: 0; padding: 0; }
+    .container { max-width: 900px; margin: 40px auto; background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+    h1 { margin: 0 0 12px; }
+    .drop { border: 2px dashed #6b7cff; border-radius: 12px; padding: 32px; text-align: center; color: #6b7cff; background: #f0f2ff; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+    .row { display: flex; flex-direction: column; }
+    label { font-size: 14px; color: #555; margin-bottom: 6px; }
+    select, input { padding: 10px; border: 1px solid #d5daf9; border-radius: 8px; background: #fafbff; }
+    button { padding: 12px 18px; background: #6b7cff; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .actions { margin-top: 22px; display: flex; gap: 12px; }
+    .result { margin-top: 24px; padding: 16px; border-radius: 10px; background: #f7fff7; color: #155d27; border: 1px solid #b7e2c1; }
+    .error { background: #fff7f7; color: #7a1010; border-color: #e3b1b1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📸 Fotos del Computador</h1>
+    <p>Sube al menos 3 fotos claras (pantalla, teclado, carcasa, bisagras)</p>
+    <div class="drop">
+      <input id="imagenes" name="imagenes" type="file" accept="image/*" multiple />
+    </div>
+
+    <h2>🔧 Especificaciones Técnicas</h2>
+    <form id="form">
+      <div class="grid">
+        <div class="row">
+          <label>Marca / Modelo</label>
+          <input type="text" name="marca_modelo" placeholder="Ej: Lenovo IdeaPad 3" />
+        </div>
+        <div class="row">
+          <label>Procesador* (ej: Intel Pentium Silver, Core i5-1135G7, Ryzen 5 5600U)</label>
+          <input type="text" name="procesador" placeholder="Escribe el nombre del procesador" required />
+        </div>
+        <div class="row">
+          <label>Memoria RAM (GB)*</label>
+          <input type="number" name="ram_gb" value="16" min="2" required />
+        </div>
+        <div class="row">
+          <label>Capacidad Disco (GB)*</label>
+          <input type="number" name="capacidad_disco_gb" value="512" min="64" required />
+        </div>
+        <div class="row">
+          <label>Tipo de Disco*</label>
+          <select name="es_ssd" required>
+            <option value="1" selected>SSD</option>
+            <option value="0">HDD</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>¿Tiene gráfica gamer (RTX/GTX/RX)?</label>
+          <select name="tiene_grafica">
+            <option value="0" selected>No</option>
+            <option value="1">Sí</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btn" type="submit">Calcular Avalúo</button>
+      </div>
+    </form>
+
+    <div id="resultado" class="result" style="display:none"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const inputImgs = document.getElementById('imagenes');
+    const btn = document.getElementById('btn');
+    const box = document.getElementById('resultado');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      box.style.display = 'none';
+      box.classList.remove('error');
+      box.textContent = '';
+
+      const files = inputImgs.files;
+      if (!files || files.length < 3) {
+        box.style.display = 'block';
+        box.classList.add('error');
+        box.textContent = 'Debes subir al menos 3 imágenes claras (pantalla, teclado, carcasa/bisagras).';
+        return;
+      }
+
+      // Validación rápida del procesador
+      const cpu = (new FormData(form)).get('procesador')?.toString().trim();
+      if (!cpu) {
+        box.style.display = 'block';
+        box.classList.add('error');
+        box.textContent = 'Por favor escribe el procesador (ej: Core i5-1135G7, Pentium Silver, Ryzen 5 5600U).';
+        return;
+      }
+      // Validación de familia conocida para evitar nombres inexistentes
+      const cpuLower = cpu.toLowerCase();
+      const familias = [
+        'celeron','pentium','core i3','core i5','core i7','core i9',
+        'ryzen 3','ryzen 5','ryzen 7','ryzen 9','xeon','athlon','m1','m2','m3'
+      ];
+      const coincideFamilia = familias.some(k => cpuLower.includes(k));
+      if (!coincideFamilia) {
+        box.style.display = 'block';
+        box.classList.add('error');
+        box.textContent = 'El procesador no coincide con familias comunes (Celeron, Pentium, Core i*, Ryzen *, Xeon). Por favor verifica el nombre.';
+        return;
+      }
+
+      const fd = new FormData(form);
+      // Adjunta todas las imágenes bajo la misma clave "imagenes"
+      for (const f of files) fd.append('imagenes', f, f.name);
+
+      btn.disabled = true;
+      btn.textContent = 'Procesando...';
+      try {
+        const res = await fetch('/avaluo', { method: 'POST', body: fd });
+        const data = await res.json();
+
+        box.style.display = 'block';
+        if (!data.ok) {
+          box.classList.add('error');
+          box.textContent = data.error || 'Error al procesar.';
+        } else {
+          box.classList.remove('error');
+          const precio = (data.precio_predicho ?? 0).toLocaleString('es-CO');
+          const msg = data.mensaje_cliente || `Tu avalúo del pc enviado es de $${precio}. ¿Deseas continuar con el contrato?`;
+          const adv = (data.advertencias && data.advertencias.length) ? ('\n' + data.advertencias.join('\n')) : '';
+          box.textContent = msg + adv;
+        }
+      } catch (err) {
+        box.style.display = 'block';
+        box.classList.add('error');
+        box.textContent = 'Error de red o del servidor.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Calcular Avalúo';
+      }
+    });
+  </script>
+</body>
+</html>
